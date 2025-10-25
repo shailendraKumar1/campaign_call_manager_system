@@ -1,0 +1,761 @@
+{
+  "info": {
+    "name": "Campaign Call Manager API",
+    "description": "Complete API collection for Campaign Call Manager System with Authentication & Exception Handling",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "campaign-call-manager-v2"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "value",
+        "value": "{{authToken}}",
+        "type": "string"
+      },
+      {
+        "key": "key",
+        "value": "X-Auth-Token",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "dev-token-12345",
+      "type": "string"
+    },
+    {
+      "key": "campaignId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "callId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "phoneNumber",
+      "value": "+1234567890",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Campaign Management",
+      "item": [
+        {
+          "name": "Create Campaign",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('campaignId', response.id);",
+                  "    pm.test('Campaign created successfully', function () {",
+                  "        pm.expect(response.id).to.be.a('number');",
+                  "        pm.expect(response.name).to.exist;",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Production Campaign\",\n    \"description\": \"Campaign for testing with PostgreSQL, Redis, and Kafka\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campaigns/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "campaigns", ""]
+            },
+            "description": "Create a new campaign with authentication"
+          }
+        },
+        {
+          "name": "List All Campaigns",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campaigns/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "campaigns", ""]
+            },
+            "description": "Retrieve all active campaigns"
+          }
+        },
+        {
+          "name": "Get Campaign Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campaigns/{{campaignId}}/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "campaigns", "{{campaignId}}", ""]
+            },
+            "description": "Get details of a specific campaign"
+          }
+        }
+      ],
+      "description": "Campaign creation and management endpoints"
+    },
+    {
+      "name": "Phone Number Management",
+      "item": [
+        {
+          "name": "Add Phone Numbers",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.test('Phone numbers added', function () {",
+                  "        pm.expect(response.created_count).to.be.above(0);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"campaign_id\": {{campaignId}},\n    \"phone_numbers\": [\n        \"+1234567890\",\n        \"+1234567891\",\n        \"+1555123456\",\n        \"+1666789012\"\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/phone-numbers/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "phone-numbers", ""]
+            },
+            "description": "Add multiple phone numbers to a campaign"
+          }
+        }
+      ],
+      "description": "Phone number management for campaigns"
+    },
+    {
+      "name": "Call Operations",
+      "item": [
+        {
+          "name": "Initiate Call",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('callId', response.call_id);",
+                  "    pm.test('Call initiated successfully', function () {",
+                  "        pm.expect(response.call_id).to.exist;",
+                  "        pm.expect(response.status).to.eql('INITIATED');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"phone_number\": \"{{phoneNumber}}\",\n    \"campaign_id\": {{campaignId}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/initiate-call/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "initiate-call", ""]
+            },
+            "description": "Initiate an outbound call"
+          }
+        },
+        {
+          "name": "Process Callback - PICKED",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"call_id\": \"{{callId}}\",\n    \"status\": \"PICKED\",\n    \"call_duration\": 45,\n    \"external_call_id\": \"ext_abc123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/callback/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "callback", ""]
+            },
+            "description": "Process callback for a successful call (PICKED)"
+          }
+        },
+        {
+          "name": "Process Callback - DISCONNECTED",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"call_id\": \"{{callId}}\",\n    \"status\": \"DISCONNECTED\",\n    \"call_duration\": 5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/callback/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "callback", ""]
+            },
+            "description": "Process callback for a disconnected call"
+          }
+        },
+        {
+          "name": "Process Callback - RNR",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"call_id\": \"{{callId}}\",\n    \"status\": \"RNR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/callback/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "callback", ""]
+            },
+            "description": "Process callback for Ring No Response (RNR)"
+          }
+        },
+        {
+          "name": "Process Callback - FAILED",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"call_id\": \"{{callId}}\",\n    \"status\": \"FAILED\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/callback/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "callback", ""]
+            },
+            "description": "Process callback for a failed call"
+          }
+        }
+      ],
+      "description": "Call initiation and callback processing"
+    },
+    {
+      "name": "Metrics & Monitoring",
+      "item": [
+        {
+          "name": "Get System Metrics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Has metrics data', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.system_status).to.exist;",
+                  "    pm.expect(response.current_concurrent_calls).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/metrics/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "metrics", ""]
+            },
+            "description": "Get system metrics and call statistics"
+          }
+        }
+      ],
+      "description": "System metrics and monitoring endpoints"
+    },
+    {
+      "name": "Error Scenarios (Exception Handling)",
+      "item": [
+        {
+          "name": "401 - Missing Auth Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Has error structure', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.error).to.exist;",
+                  "    pm.expect(response.error.code).to.eql('unauthorized');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/metrics/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "metrics", ""]
+            },
+            "description": "Test 401 Unauthorized - No auth token provided"
+          }
+        },
+        {
+          "name": "401 - Invalid Auth Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Has error message', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.error.message).to.include('Invalid');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {
+                  "key": "value",
+                  "value": "wrong-token",
+                  "type": "string"
+                },
+                {
+                  "key": "key",
+                  "value": "X-Auth-Token",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/metrics/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "metrics", ""]
+            },
+            "description": "Test 401 Unauthorized - Invalid auth token"
+          }
+        },
+        {
+          "name": "400 - Invalid Phone Number",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Has error structure', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.error).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"phone_number\": \"invalid\",\n    \"campaign_id\": {{campaignId}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/initiate-call/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "initiate-call", ""]
+            },
+            "description": "Test 400 Bad Request - Invalid phone number format"
+          }
+        },
+        {
+          "name": "400 - Missing Required Fields",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"phone_number\": \"+1234567890\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/initiate-call/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "initiate-call", ""]
+            },
+            "description": "Test 400 Bad Request - Missing campaign_id"
+          }
+        },
+        {
+          "name": "404 - Campaign Not Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('Has error structure', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.error).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"phone_number\": \"+1234567890\",\n    \"campaign_id\": 99999\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/initiate-call/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "initiate-call", ""]
+            },
+            "description": "Test 404 Not Found - Non-existent campaign"
+          }
+        },
+        {
+          "name": "404 - Call Not Found (Callback)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"call_id\": \"nonexistent_call_id\",\n    \"status\": \"PICKED\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/callback/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "callback", ""]
+            },
+            "description": "Test 404 Not Found - Non-existent call ID"
+          }
+        },
+        {
+          "name": "400 - Invalid Call Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"call_id\": \"{{callId}}\",\n    \"status\": \"INVALID_STATUS\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/callback/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "callback", ""]
+            },
+            "description": "Test 400 Bad Request - Invalid call status"
+          }
+        }
+      ],
+      "description": "Test error scenarios and exception handling (400, 401, 404, 500)"
+    },
+    {
+      "name": "Complete Workflow",
+      "item": [
+        {
+          "name": "Step 1: Create Campaign",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('campaignId', response.id);",
+                  "    console.log('Campaign ID:', response.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Workflow Test Campaign\",\n    \"description\": \"End-to-end workflow test\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/campaigns/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "campaigns", ""]
+            }
+          }
+        },
+        {
+          "name": "Step 2: Add Phone Numbers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"campaign_id\": {{campaignId}},\n    \"phone_numbers\": [\n        \"+1234567890\",\n        \"+1234567891\"\n    ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/phone-numbers/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "phone-numbers", ""]
+            }
+          }
+        },
+        {
+          "name": "Step 3: Initiate Call",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('callId', response.call_id);",
+                  "    console.log('Call ID:', response.call_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"phone_number\": \"+1234567890\",\n    \"campaign_id\": {{campaignId}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/initiate-call/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "initiate-call", ""]
+            }
+          }
+        },
+        {
+          "name": "Step 4: Process Callback",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"call_id\": \"{{callId}}\",\n    \"status\": \"PICKED\",\n    \"call_duration\": 60\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/callback/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "callback", ""]
+            }
+          }
+        },
+        {
+          "name": "Step 5: Check Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/metrics/",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "metrics", ""]
+            }
+          }
+        }
+      ],
+      "description": "Complete end-to-end workflow - run in sequence"
+    }
+  ]
+}

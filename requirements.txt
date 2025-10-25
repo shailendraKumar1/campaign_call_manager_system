@@ -1,0 +1,12 @@
+Django>=4.2,<5.0
+djangorestframework>=3.14
+psycopg2-binary>=2.9
+kafka-python>=2.0.2
+django-redis>=5.2.0
+schedule>=1.1.0
+PyYAML>=6.0
+requests>=2.28.0
+prometheus-client>=0.16.0
+celery>=5.2.0
+redis>=4.5.0
+Flask>=2.3.0

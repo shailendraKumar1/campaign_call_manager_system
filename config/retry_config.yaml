@@ -1,0 +1,82 @@
+# Retry Configuration for Campaign Call Manager
+# This file defines retry rules and time slots for different scenarios
+
+# Global retry rules (apply to all campaigns unless overridden)
+global_rules:
+  - name: "Weekend Morning Slots"
+    days: ["saturday", "sunday"]
+    time_slots:
+      - start_time: "10:00"
+        end_time: "12:00"
+        max_attempts: 2
+        retry_interval_minutes: 30
+      - start_time: "18:00"
+        end_time: "19:00"
+        max_attempts: 2
+        retry_interval_minutes: 15
+  
+  - name: "Weekday Business Hours"
+    days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+    time_slots:
+      - start_time: "09:00"
+        end_time: "17:00"
+        max_attempts: 3
+        retry_interval_minutes: 60
+  
+  - name: "Weekday Evening"
+    days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+    time_slots:
+      - start_time: "18:00"
+        end_time: "20:00"
+        max_attempts: 2
+        retry_interval_minutes: 45
+
+# Campaign-specific rules (override global rules for specific campaigns)
+campaign_rules:
+  # Example: High-priority campaign with more aggressive retry
+  - campaign_id: 1
+    name: "High Priority Campaign"
+    rules:
+      - name: "Aggressive Weekend Retry"
+        days: ["saturday", "sunday"]
+        time_slots:
+          - start_time: "10:00"
+            end_time: "12:00"
+            max_attempts: 4
+            retry_interval_minutes: 20
+          - start_time: "14:00"
+            end_time: "16:00"
+            max_attempts: 3
+            retry_interval_minutes: 30
+
+# Default settings
+defaults:
+  max_attempts: 3
+  retry_interval_minutes: 60
+  concurrent_call_limit: 100
+  duplicate_call_window_minutes: 5
+
+# Status-specific retry behavior
+status_retry_rules:
+  DISCONNECTED:
+    should_retry: true
+    increment_attempt: true
+  RNR:
+    should_retry: true
+    increment_attempt: true
+  PICKED:
+    should_retry: false
+    increment_attempt: false
+  FAILED:
+    should_retry: true
+    increment_attempt: true
+    max_attempts: 1  # Only retry failed calls once
+
+# Time zone settings
+timezone: "UTC"
+
+# Scheduler settings
+scheduler:
+  check_interval_minutes: 1
+  batch_size: 100  # Number of calls to process in each batch
+  max_concurrent_retries: 50
