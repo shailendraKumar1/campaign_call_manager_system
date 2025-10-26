@@ -2,9 +2,14 @@
 
 **Production-ready Django system for managing outbound call campaigns with Celery async processing, intelligent retry logic, and connection pooling.**
 
+### Quick Links
+- **[REQUIREMENTS.md](REQUIREMENTS.md)** - Complete system requirements & specifications
+- **[SETUP.md](SETUP.md)** - Installation guide (Local + Docker setup)
+- **[WORKFLOW_DOCUMENTATION.md](WORKFLOW_DOCUMENTATION.md)** - API usage & workflows
+
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 1. [Project Overview](#-project-overview)
 2. [Requirements](#-requirements)
@@ -15,7 +20,7 @@
 
 ---
 
-## 🎯 Project Overview
+## Project Overview
 
 High-volume outbound calling system supporting **1000+ concurrent calls** with automatic retry, connection pooling, and zero data loss.
 
@@ -36,9 +41,21 @@ High-volume outbound calling system supporting **1000+ concurrent calls** with a
 - **Workers**: Celery 5.5.3 (4 workers)
 - **Scheduler**: Celery Beat
 
+### Getting Started
+
+1. **Read Requirements** → [REQUIREMENTS.md](REQUIREMENTS.md) - Understand what the system does
+2. **Setup System** → [SETUP.md](SETUP.md) - Install locally or via Docker (5 minutes)
+3. **Test APIs** → [WORKFLOW_DOCUMENTATION.md](WORKFLOW_DOCUMENTATION.md) - Try example workflows
+
+**Quick Start (Docker)**:
+```bash
+docker-compose up --build -d
+curl -H "X-Auth-Token: dev-token-12345" http://localhost:8000/api/v1/metrics/
+```
+
 ---
 
-## 📋 Requirements
+## Requirements
 
 ### Functional Requirements
 
@@ -62,7 +79,7 @@ High-volume outbound calling system supporting **1000+ concurrent calls** with a
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ### High-Level Architecture with Retry Flow
 
@@ -152,7 +169,7 @@ High-volume outbound calling system supporting **1000+ concurrent calls** with a
 
 ---
 
-## 🧩 Components
+## Components
 
 ### 1. Django API Server
 **Location**: `calls/views.py`
@@ -199,7 +216,7 @@ Simulates external call service, queues callbacks to Celery
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 ### Backend
 - **Framework**: Django 4.2.25 + Django REST Framework 3.14+
@@ -224,7 +241,7 @@ Simulates external call service, queues callbacks to Celery
 
 ---
 
-## 🚀 Future Scope & Scaling
+## Future Scope & Scaling
 
 ### Phase 1: High-Scale Message Queue (1000+ calls/sec)
 
@@ -373,15 +390,14 @@ class ShardRouter:
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 | Document | Purpose |
 |----------|---------|
-| **[SETUP.md](SETUP.md)** | 📦 Complete installation guide (Local + Docker) |
+| **[REQUIREMENTS.md](REQUIREMENTS.md)** | 📋 **Complete system requirements & specifications** |
+| **[SETUP.md](SETUP.md)** | 📦 Installation guide (Local + Docker) |
 | **[WORKFLOW_DOCUMENTATION.md](WORKFLOW_DOCUMENTATION.md)** | 🔄 Detailed API workflow and usage examples |
 | `Campaign_Call_Manager.postman_collection.json` | 🧪 Ready-to-use Postman API tests |
 | `.env.example` | ⚙️ Environment variables template |
 
 ---
-
-**🎉 System Ready!** - Production-ready with enterprise-grade architecture.
