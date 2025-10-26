@@ -241,6 +241,8 @@ def process_callback_event(self, call_id, status, call_duration=None, external_c
                     call_log.status = status
                     from datetime import timedelta
                     call_log.next_retry_at = timezone.now() + timedelta(minutes=5)
+                    # End concurrency tracking so retry can start
+                    ConcurrencyManager.end_call(call_id, call_log.phone_number)
                     logger.info(f"Retry scheduled: {call_id} (attempt {call_log.attempt_count}/{call_log.max_attempts})")
                 else:
                     # Max attempts reached

@@ -11,7 +11,7 @@ global_rules:
     days: ["saturday", "sunday"]
     time_slots:
       - start_time: "10:00"
-        end_time: "16:00"
+        end_time: "23:59"
         max_attempts: 2
         retry_interval_minutes: 90
 
