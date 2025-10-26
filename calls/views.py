@@ -10,7 +10,7 @@ from django.core.cache import cache
 from .models import CallLog, Campaign, PhoneNumber, CallMetrics, ConcurrencyControl
 from .serializers import CallLogSerializer, CampaignSerializer, PhoneNumberSerializer
 from .tasks import process_call_initiation, process_callback_event
-from .utils import ConcurrencyManager, MetricsManager, generate_call_id, CallValidationResult, is_valid_phone_number
+from .utils import ConcurrencyManager, MetricsManager, generate_call_id, CallValidationResult, is_valid_phone_number, CallQueueManager
 from config import Config
 
 logger = logging.getLogger(__name__)
