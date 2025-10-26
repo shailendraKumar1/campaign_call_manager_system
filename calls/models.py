@@ -30,6 +30,7 @@ class PhoneNumber(models.Model):
 class CallLog(models.Model):
     CALL_STATUS_CHOICES = [
         ('INITIATED', 'Initiated'),
+        ('QUEUED', 'Queued'),
         ('PROCESSING', 'Processing'),
         ('PICKED', 'Picked'),
         ('DISCONNECTED', 'Disconnected'),

@@ -4,11 +4,9 @@ import os
 
 
 class Config:
-    # Kafka settings
-    KAFKA_BOOTSTRAP_SERVERS = os.environ.get('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092').split(",")
-    KAFKA_INITIATE_CALL_TOPIC = os.environ.get('KAFKA_INITIATE_CALL_TOPIC', 'initiated_call_topic')
-    KAFKA_CALLBACK_TOPIC = os.environ.get('KAFKA_CALLBACK_TOPIC', 'callback_topic')
-    KAFKA_DLQ_TOPIC = os.environ.get('KAFKA_DLQ_TOPIC', 'dlq_topic')
+    # Celery settings
+    CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/1')
+    CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/2')
 
     # Database (PostgreSQL)
     POSTGRES_DB = os.environ.get('POSTGRES_DB', 'campaign_db')
@@ -40,6 +38,17 @@ class Config:
     MOCK_SERVICE_URL = os.environ.get('MOCK_SERVICE_URL', 'http://localhost:8001')
     EXTERNAL_CALL_SERVICE_URL = os.environ.get('EXTERNAL_CALL_SERVICE_URL', 'http://localhost:8001')
     
+    # Mock service call simulation settings
+    MOCK_CALL_DELAY_MIN = float(os.environ.get('MOCK_CALL_DELAY_MIN', '1'))
+    MOCK_CALL_DELAY_MAX = float(os.environ.get('MOCK_CALL_DELAY_MAX', '10'))
+    
+    # Mock service call outcomes (status, probability, duration_range)
+    # Probabilities should sum to 1.0
+    # Format: [(status, probability, (min_duration, max_duration)), ...]
+    MOCK_CALL_OUTCOMES = [
+        ('DISCONNECTED', 1.0, (1, 5)),      # 100% disconnected - Testing retry flow
+    ]
+    
     # Concurrency and duplicate prevention
     REDIS_CONCURRENCY_KEY = os.environ.get('REDIS_CONCURRENCY_KEY', 'active_calls_count')
     REDIS_DUPLICATE_PREVENTION_PREFIX = os.environ.get('REDIS_DUPLICATE_PREVENTION_PREFIX', 'call_lock:')
@@ -59,5 +68,11 @@ class Config:
     X_AUTH_TOKEN = os.environ.get('X_AUTH_TOKEN', 'dev-token-12345')
     
     # Scheduler settings
-    SCHEDULER_INTERVAL_MINUTES = int(os.environ.get('SCHEDULER_INTERVAL_MINUTES', '1'))
+    SCHEDULER_INTERVAL_MINUTES = int(os.environ.get('SCHEDULER_INTERVAL_MINUTES', '10'))
     SCHEDULER_ENABLED = os.environ.get('SCHEDULER_ENABLED', 'true').lower() == 'true'
+    
+    # Connection Pooling settings
+    DB_CONN_MAX_AGE = int(os.environ.get('DB_CONN_MAX_AGE', '600'))  # PostgreSQL persistent connections (seconds)
+    DB_CONN_HEALTH_CHECKS = os.environ.get('DB_CONN_HEALTH_CHECKS', 'true').lower() == 'true'
+    REDIS_MAX_CONNECTIONS = int(os.environ.get('REDIS_MAX_CONNECTIONS', '50'))  # Redis connection pool size
+    CELERY_BROKER_POOL_LIMIT = int(os.environ.get('CELERY_BROKER_POOL_LIMIT', '50'))  # Celery broker pool

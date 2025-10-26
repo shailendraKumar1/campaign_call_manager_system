@@ -85,9 +85,7 @@ class Command(BaseCommand):
                 'total_calls_rnr': total_rnr,
                 'total_calls_failed': total_failed,
                 'total_retries': total_retries,
-                'total_call_duration_seconds': total_duration,
-                'peak_concurrent_calls': 0,  # Would need to calculate from logs
-                'dlq_entries_created': 0,    # Would need to calculate from DLQ
+                'total_call_duration_seconds': total_duration
             }
         )
         

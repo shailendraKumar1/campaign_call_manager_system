@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import timedelta
-from calls.consumer import DLQProcessor
+from calls.dlq_processor import DLQProcessor
 from calls.models import DLQEntry
 from config import Config
 

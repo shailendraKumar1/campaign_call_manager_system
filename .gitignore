@@ -154,5 +154,15 @@ logs/
 staticfiles/
 media/
 
+# Celery
+celerybeat-schedule*
+
+# Redis
+dump.rdb
+
+# IDE
+.idea/
+.vscode/
+
 # Docker
 .dockerignore

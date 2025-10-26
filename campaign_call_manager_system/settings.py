@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 from config import Config
 
@@ -85,6 +86,17 @@ DATABASES = {
         'PASSWORD': Config.POSTGRES_PASSWORD,
         'HOST': Config.POSTGRES_HOST,
         'PORT': Config.POSTGRES_PORT,
+        'OPTIONS': {
+            # Connection pooling settings
+            'connect_timeout': 10,  # Connection timeout in seconds
+            'options': '-c statement_timeout=30000',  # 30 second statement timeout
+        },
+        # Django connection pooling (persistent connections)
+        'CONN_MAX_AGE': Config.DB_CONN_MAX_AGE,  # Keep connections alive (0 = close immediately)
+        'CONN_HEALTH_CHECKS': Config.DB_CONN_HEALTH_CHECKS,  # Check connection health before using from pool
+        # Connection pool size (for production, use pgbouncer for better pooling)
+        'ATOMIC_REQUESTS': False,  # Don't wrap every view in transaction (we use explicit transactions)
+        'AUTOCOMMIT': True,  # Use autocommit mode
     }
 }
 
@@ -95,7 +107,17 @@ CACHES = {
         'LOCATION': Config.REDIS_URL,
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-        }
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': Config.REDIS_MAX_CONNECTIONS,  # Maximum connections in pool
+                'retry_on_timeout': True,  # Retry if connection times out
+            },
+            'SOCKET_CONNECT_TIMEOUT': 5,  # Socket connection timeout
+            'SOCKET_TIMEOUT': 5,  # Socket read/write timeout
+            'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',  # Compress large values
+            'IGNORE_EXCEPTIONS': False,  # Raise exceptions on Redis errors
+        },
+        'KEY_PREFIX': 'campaign_call',  # Prefix all cache keys
+        'TIMEOUT': 300,  # Default cache timeout (5 minutes)
     }
 }
 
@@ -138,14 +160,61 @@ STATIC_URL = 'static/'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Kafka integration constants
-KAFKA_BOOTSTRAP_SERVERS = Config.KAFKA_BOOTSTRAP_SERVERS
-KAFKA_INITIATE_CALL_TOPIC = Config.KAFKA_INITIATE_CALL_TOPIC
-KAFKA_CALLBACK_TOPIC = Config.KAFKA_CALLBACK_TOPIC
-KAFKA_DLQ_TOPIC = Config.KAFKA_DLQ_TOPIC
+# Celery Configuration (uses Redis as broker and result backend)
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/1')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/2')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25 minutes
+CELERY_TASK_ACKS_LATE = True  # Task acknowledged after execution
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1  # One task at a time per worker
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_TASK_DEFAULT_RETRY_DELAY = 60  # Retry after 60 seconds
+CELERY_TASK_MAX_RETRIES = 3
+
+# Celery Redis Connection Pooling
+CELERY_BROKER_CONNECTION_RETRY = True
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 10
+CELERY_BROKER_POOL_LIMIT = Config.CELERY_BROKER_POOL_LIMIT  # Max connections to broker (Redis DB 1)
+CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
+    'master_name': None,
+    'max_connections': Config.CELERY_BROKER_POOL_LIMIT,  # Max connections to result backend (Redis DB 2)
+    'socket_keepalive': True,
+    'socket_keepalive_options': {
+        1: 1,  # TCP_KEEPIDLE
+        2: 1,  # TCP_KEEPINTVL
+        3: 3,  # TCP_KEEPCNT
+    },
+    'retry_on_timeout': True,
+    'health_check_interval': 30,  # Check connection health every 30s
+}
+
+# Celery Beat Schedule (Periodic Tasks)
+from celery.schedules import crontab
+from config import Config
+
+# Calculate schedule interval from config
+RETRY_INTERVAL_SECONDS = Config.SCHEDULER_INTERVAL_MINUTES * 60
+RETRY_EXPIRE_SECONDS = max(RETRY_INTERVAL_SECONDS - 10, 55)  # Expire 10s before next run
+
+CELERY_BEAT_SCHEDULE = {
+    'process-retry-calls-periodic': {
+        'task': 'calls.periodic_tasks.process_retry_calls',
+        'schedule': float(RETRY_INTERVAL_SECONDS),  # Configurable from Config.SCHEDULER_INTERVAL_MINUTES
+        'options': {'expires': float(RETRY_EXPIRE_SECONDS)}  # Prevent overlap
+    },
+    'cleanup-old-metrics-daily': {
+        'task': 'calls.periodic_tasks.cleanup_old_metrics',
+        'schedule': crontab(hour=2, minute=0),  # Run daily at 2:00 AM
+    },
+}
 
 # Logging Configuration
-import os
 LOGS_DIR = BASE_DIR / 'logs'
 os.makedirs(LOGS_DIR, exist_ok=True)
 
@@ -159,7 +228,7 @@ LOGGING = {
             'datefmt': '%Y-%m-%d %H:%M:%S',
         },
         'simple': {
-            'format': '[{levelname}] {asctime} - {message}',
+            'format': '[{levelname}] {asctime} [{module}:{lineno}] - {message}',
             'style': '{',
             'datefmt': '%Y-%m-%d %H:%M:%S',
         },
@@ -189,50 +258,18 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-        'file_debug': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOGS_DIR / 'debug.log',
-            'maxBytes': 10485760,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
         'file_info': {
             'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': LOGS_DIR / 'app.log',
             'maxBytes': 10485760,  # 10MB
             'backupCount': 10,
-            'formatter': 'verbose',
+            'formatter': 'simple',
         },
         'file_error': {
             'level': 'ERROR',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': LOGS_DIR / 'error.log',
-            'maxBytes': 10485760,  # 10MB
-            'backupCount': 10,
-            'formatter': 'verbose',
-        },
-        'file_calls': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOGS_DIR / 'calls.log',
-            'maxBytes': 10485760,  # 10MB
-            'backupCount': 15,
-            'formatter': 'verbose',
-        },
-        'file_kafka': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOGS_DIR / 'kafka.log',
-            'maxBytes': 10485760,  # 10MB
-            'backupCount': 10,
-            'formatter': 'verbose',
-        },
-        'file_api': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOGS_DIR / 'api.log',
             'maxBytes': 10485760,  # 10MB
             'backupCount': 10,
             'formatter': 'verbose',
@@ -261,41 +298,30 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
-        # Application loggers
+        # Application loggers - All to app.log
         'calls': {
-            'handlers': ['console', 'file_calls', 'file_error'],
+            'handlers': ['console', 'file_info', 'file_error'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
         'calls.views': {
-            'handlers': ['console', 'file_api', 'file_error'],
+            'handlers': ['console', 'file_info', 'file_error'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
-        'calls.consumer': {
-            'handlers': ['console', 'file_kafka', 'file_error'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False,
-        },
-        'calls.publisher': {
-            'handlers': ['console', 'file_kafka', 'file_error'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False,
-        },
-        'calls.scheduler': {
-            'handlers': ['console', 'file_calls', 'file_error'],
+        'calls.tasks': {
+            'handlers': ['console', 'file_info', 'file_error'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
         'calls.utils': {
-            'handlers': ['console', 'file_calls', 'file_error'],
+            'handlers': ['console', 'file_info', 'file_error'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
-        # Kafka library logger
-        'kafka': {
-            'handlers': ['file_kafka'],
-            'level': 'WARNING',
+        'calls.periodic_tasks': {
+            'handlers': ['console', 'file_info', 'file_error'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
     },

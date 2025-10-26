@@ -1,5 +1,5 @@
 """
-Unified command to start all services: Django server, Consumers, and Scheduler
+Unified command to start all services: Django server, Celery Workers, and Celery Beat
 This is the recommended way to run the complete system for testing all features
 """
 from django.core.management.base import BaseCommand
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = 'Start all services: Django server, Kafka consumers, and retry scheduler'
+    help = 'Start all services: Django server, Celery workers, and retry scheduler'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -62,13 +62,13 @@ class Command(BaseCommand):
                 self.start_mock_service()
                 time.sleep(2)  # Wait for mock service to start
             
-            # 2. Start Kafka Consumers
-            self.start_consumers()
-            time.sleep(2)  # Wait for consumers to initialize
+            # 2. Start Celery Workers
+            self.start_celery_workers()
+            time.sleep(2)  # Wait for workers to initialize
             
-            # 3. Start Retry Scheduler
-            self.start_scheduler()
-            time.sleep(2)  # Wait for scheduler to initialize
+            # 3. Start Celery Beat (Scheduler)
+            self.start_celery_beat()
+            time.sleep(2)  # Wait for beat to initialize
             
             # 4. Start Django Server (last, so it's ready to accept requests)
             self.start_django_server(host, port)
@@ -123,35 +123,41 @@ class Command(BaseCommand):
                 self.style.ERROR(f'   ❌ Failed to start mock service: {str(e)}')
             )
 
-    def start_consumers(self):
-        """Start Kafka consumers in a thread"""
-        self.stdout.write('🎧 Starting Kafka Consumers...')
-        
-        def run_consumers():
-            try:
-                call_command('run_consumers')
-            except Exception as e:
-                logger.error(f'Consumer error: {str(e)}')
-        
-        thread = threading.Thread(target=run_consumers, daemon=True, name='Consumers')
-        thread.start()
-        self.threads.append(thread)
-        self.stdout.write(self.style.SUCCESS('   ✅ Kafka consumers started'))
+    def start_celery_workers(self):
+        """Start Celery workers as subprocess"""
+        self.stdout.write('⚙️  Starting Celery Workers...')
+        try:
+            # Start Celery worker process
+            process = subprocess.Popen(
+                ['celery', '-A', 'campaign_call_manager_system', 'worker', '--loglevel=info', '--concurrency=4'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=os.getcwd()
+            )
+            self.processes.append(('Celery Workers', process))
+            self.stdout.write(self.style.SUCCESS('   ✅ Celery workers started (4 workers)'))
+        except Exception as e:
+            self.stdout.write(
+                self.style.ERROR(f'   ❌ Failed to start Celery workers: {str(e)}')
+            )
 
-    def start_scheduler(self):
-        """Start retry scheduler in a thread"""
-        self.stdout.write('⏰ Starting Retry Scheduler...')
-        
-        def run_scheduler():
-            try:
-                call_command('run_scheduler')
-            except Exception as e:
-                logger.error(f'Scheduler error: {str(e)}')
-        
-        thread = threading.Thread(target=run_scheduler, daemon=True, name='Scheduler')
-        thread.start()
-        self.threads.append(thread)
-        self.stdout.write(self.style.SUCCESS('   ✅ Retry scheduler started'))
+    def start_celery_beat(self):
+        """Start Celery Beat scheduler as subprocess"""
+        self.stdout.write('⏰ Starting Celery Beat (Scheduler)...')
+        try:
+            # Start Celery Beat process
+            process = subprocess.Popen(
+                ['celery', '-A', 'campaign_call_manager_system', 'beat', '--loglevel=info'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=os.getcwd()
+            )
+            self.processes.append(('Celery Beat', process))
+            self.stdout.write(self.style.SUCCESS('   ✅ Celery Beat started (runs every minute)'))
+        except Exception as e:
+            self.stdout.write(
+                self.style.ERROR(f'   ❌ Failed to start Celery Beat: {str(e)}')
+            )
 
     def start_django_server(self, host, port):
         """Start Django development server in a thread"""
@@ -174,8 +180,8 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('📊 Service Status:'))
         self.stdout.write('')
         self.stdout.write(f'   🌐 Django API Server:    http://{host}:{port}')
-        self.stdout.write(f'   🎧 Kafka Consumers:      Running (2 consumers)')
-        self.stdout.write(f'   ⏰ Retry Scheduler:      Running')
+        self.stdout.write(f'   ⚙️  Celery Workers:       Running (4 workers)')
+        self.stdout.write(f'   ⏰ Celery Beat:          Running (retry scheduler)')
         if mock_enabled:
             self.stdout.write(f'   📞 Mock Service:         http://localhost:8001')
         self.stdout.write('')
@@ -192,7 +198,7 @@ class Command(BaseCommand):
         self.stdout.write('   • Application:  tail -f logs/app.log')
         self.stdout.write('   • API:          tail -f logs/api.log')
         self.stdout.write('   • Calls:        tail -f logs/calls.log')
-        self.stdout.write('   • Kafka:        tail -f logs/kafka.log')
+        self.stdout.write('   • Celery:       celery -A campaign_call_manager_system inspect active')
         self.stdout.write('   • Errors:       tail -f logs/error.log')
 
     def shutdown_all_services(self):

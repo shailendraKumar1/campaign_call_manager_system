@@ -11,15 +11,25 @@ Usage:
 The service will run on http://localhost:8001 by default.
 """
 
+import os
+import sys
+import django
+
+# Setup Django environment for Celery task access
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'campaign_call_manager_system.settings')
+django.setup()
+
 import json
 import logging
 import random
 import threading
 import time
 import uuid
+import asyncio
 from datetime import datetime
 from flask import Flask, request, jsonify
-import requests
+import httpx
+from config import Config
 
 # Configure logging
 logging.basicConfig(
@@ -37,12 +47,11 @@ active_calls = {}
 CALLBACK_URL = "http://localhost:8000/api/v1/callback/"
 MOCK_SERVICE_PORT = 8001
 
-# Call simulation settings
-CALL_OUTCOMES = [
-    ('PICKED', 0.6, (10, 120)),      # 60% picked, 10-120 seconds duration
-    ('DISCONNECTED', 0.25, (2, 10)), # 25% disconnected, 2-10 seconds
-    ('RNR', 0.15, (30, 45))          # 15% ring no response, 30-45 seconds
-]
+# Call simulation settings - loaded from config.py
+# You can change probabilities in config.py to test retry logic
+CALL_OUTCOMES = Config.MOCK_CALL_OUTCOMES
+CALL_DELAY_MIN = Config.MOCK_CALL_DELAY_MIN
+CALL_DELAY_MAX = Config.MOCK_CALL_DELAY_MAX
 
 
 class CallSimulator:
@@ -55,8 +64,12 @@ class CallSimulator:
         phone_number = call_data['phone_number']
         
         try:
-            # Random delay before call outcome (1-10 seconds)
-            delay = random.uniform(1, 10)
+            # Random delay before call outcome (configurable)
+            delay = random.uniform(CALL_DELAY_MIN, CALL_DELAY_MAX)
+            logger.info(
+                f"[Mock Service] Simulating call | "
+                f"call_id={call_id}, phone={phone_number}, wait={delay:.1f}s"
+            )
             time.sleep(delay)
             
             # Determine call outcome based on probabilities
@@ -83,22 +96,15 @@ class CallSimulator:
                 'timestamp': datetime.now().isoformat()
             }
             
-            logger.info(f"Sending callback for {call_id}: {status} ({duration}s)")
+            logger.info(
+                f"[STEP 7] Callback Generated | "
+                f"call_id={call_id}, status={status}, duration={duration}s, url={CALLBACK_URL}"
+            )
             
             # Send callback to main service
             try:
-                response = requests.put(
-                    CALLBACK_URL,
-                    json=callback_data,
-                    timeout=10
-                )
-                
-                if response.status_code == 200:
-                    logger.info(f"Callback sent successfully for {call_id}")
-                else:
-                    logger.error(f"Callback failed for {call_id}: {response.status_code}")
-                    
-            except requests.exceptions.RequestException as e:
+                CallSimulator.send_callback(callback_data, call_id)
+            except Exception as e:
                 logger.error(f"Error sending callback for {call_id}: {str(e)}")
             
             # Remove from active calls
@@ -107,6 +113,52 @@ class CallSimulator:
                 
         except Exception as e:
             logger.error(f"Error simulating call {call_id}: {str(e)}")
+    
+    @staticmethod
+    def send_callback(callback_data, call_id):
+        """
+        Queue callback task to Celery instead of calling API directly
+        
+        Benefits:
+        - Decouples mock service from main API
+        - Better scalability - callbacks processed by Celery workers
+        - Automatic retry logic
+        - Prevents callback API overload
+        """
+        try:
+            # Import Celery task dynamically to avoid circular imports
+            from calls.tasks import process_external_callback
+            
+            logger.info(f"[STEP 7] Queueing callback task | call_id={call_id}, status={callback_data.get('status')}")
+            
+            # Queue task to Celery (Redis)
+            task = process_external_callback.delay(callback_data)
+            
+            logger.info(f"✅ Callback task queued: {call_id} (task_id: {task.id})")
+            
+        except Exception as e:
+            # Fallback to direct HTTP call if Celery queueing fails
+            logger.error(f"Failed to queue callback task for {call_id}: {str(e)}")
+            logger.info(f"Falling back to direct HTTP callback for {call_id}")
+            
+            try:
+                with httpx.Client(timeout=10.0, verify=False, http2=False) as client:
+                    response = client.put(
+                        CALLBACK_URL,
+                        json=callback_data,
+                        headers={
+                            'X-Auth-Token': Config.X_AUTH_TOKEN,
+                            'Content-Type': 'application/json'
+                        }
+                    )
+                    
+                    if response.status_code == 200:
+                        logger.info(f"✅ Direct callback sent successfully: {call_id}")
+                    else:
+                        logger.error(f"❌ Direct callback failed: {call_id} (status: {response.status_code})")
+                        
+            except httpx.RequestError as http_error:
+                logger.error(f"Direct callback HTTP error for {call_id}: {str(http_error)}")
 
 
 @app.route('/health', methods=['GET'])

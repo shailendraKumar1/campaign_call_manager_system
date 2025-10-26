@@ -1,13 +1,25 @@
 import logging
+import json
 from datetime import datetime, timedelta
+from enum import Enum
 from django.core.cache import cache
-from django.utils import timezone
 from django.db import transaction
+from django.utils import timezone
 from .models import ConcurrencyControl, CallMetrics
 from config import Config
 import uuid
+import redis
 
 logger = logging.getLogger(__name__)
+
+class CallValidationResult(Enum):
+    """Enum for call validation results"""
+    OK = "OK"
+    CAPACITY_LIMIT_REACHED = "CAPACITY_LIMIT_REACHED"
+    DUPLICATE_CALL_IN_PROGRESS = "DUPLICATE_CALL_IN_PROGRESS"
+
+# Redis client for queue operations
+redis_client = redis.from_url(Config.REDIS_URL, decode_responses=True)
 
 
 class ConcurrencyManager:
@@ -15,71 +27,77 @@ class ConcurrencyManager:
     
     @staticmethod
     def can_initiate_call(phone_number, campaign_id):
-        """Check if a call can be initiated based on concurrency and duplicate rules"""
+        """
+        Check if call can be initiated
         
-        # Check if we're at max concurrent calls
+        Returns:
+            tuple: (can_initiate: bool, result: CallValidationResult)
+        """
+        
+        # Check max concurrent calls
         current_count = cache.get(Config.REDIS_CONCURRENCY_KEY, 0)
+        
         if current_count >= Config.MAX_CONCURRENT_CALLS:
-            logger.warning(f"Max concurrent calls reached: {current_count}")
-            return False, "Maximum concurrent calls limit reached"
+            return False, CallValidationResult.CAPACITY_LIMIT_REACHED
         
-        # Check for duplicate calls to same number
+        # Check duplicate calls
         duplicate_key = f"{Config.REDIS_DUPLICATE_PREVENTION_PREFIX}{phone_number}"
-        if cache.get(duplicate_key):
-            logger.warning(f"Duplicate call prevention: {phone_number}")
-            return False, "Call to this number already in progress"
+        existing_call_id = cache.get(duplicate_key)
         
-        return True, "OK"
+        if existing_call_id:
+            return False, CallValidationResult.DUPLICATE_CALL_IN_PROGRESS
+        
+        return True, CallValidationResult.OK
+    
+    @staticmethod
+    def get_available_slots():
+        """Get number of available concurrency slots"""
+        current_count = cache.get(Config.REDIS_CONCURRENCY_KEY, 0)
+        return max(0, Config.MAX_CONCURRENT_CALLS - current_count)
     
     @staticmethod
     def start_call(call_id, phone_number, campaign_id):
-        """Mark a call as started in concurrency control"""
+        """Start call tracking"""
         try:
             with transaction.atomic():
-                # Increment concurrent calls counter
                 current_count = cache.get(Config.REDIS_CONCURRENCY_KEY, 0)
                 cache.set(Config.REDIS_CONCURRENCY_KEY, current_count + 1, timeout=3600)
                 
-                # Set duplicate prevention lock
                 duplicate_key = f"{Config.REDIS_DUPLICATE_PREVENTION_PREFIX}{phone_number}"
                 cache.set(duplicate_key, call_id, timeout=Config.DUPLICATE_CALL_WINDOW_MINUTES * 60)
                 
-                # Track in database for persistence
                 ConcurrencyControl.objects.create(
                     call_id=call_id,
                     phone_number=phone_number,
                     campaign_id=campaign_id
                 )
                 
-                logger.info(f"Call started: {call_id}, concurrent count: {current_count + 1}")
+                logger.info(f"Call tracking started: {call_id}")
                 return True
                 
         except Exception as e:
-            logger.error(f"Error starting call {call_id}: {str(e)}")
+            logger.error(f"Error starting call tracking: {str(e)}", exc_info=True)
             return False
     
     @staticmethod
     def end_call(call_id, phone_number):
-        """Mark a call as ended in concurrency control"""
+        """End call tracking"""
         try:
             with transaction.atomic():
-                # Decrement concurrent calls counter
                 current_count = cache.get(Config.REDIS_CONCURRENCY_KEY, 0)
                 if current_count > 0:
                     cache.set(Config.REDIS_CONCURRENCY_KEY, current_count - 1, timeout=3600)
                 
-                # Remove duplicate prevention lock
                 duplicate_key = f"{Config.REDIS_DUPLICATE_PREVENTION_PREFIX}{phone_number}"
                 cache.delete(duplicate_key)
                 
-                # Remove from database tracking
                 ConcurrencyControl.objects.filter(call_id=call_id).delete()
                 
-                logger.info(f"Call ended: {call_id}, concurrent count: {max(0, current_count - 1)}")
+                logger.info(f"Call tracking ended: {call_id}")
                 return True
                 
         except Exception as e:
-            logger.error(f"Error ending call {call_id}: {str(e)}")
+            logger.error(f"Error ending call tracking: {str(e)}", exc_info=True)
             return False
     
     @staticmethod
@@ -175,10 +193,8 @@ class MetricsManager:
 
 
 def generate_call_id(campaign_id, phone_number):
-    """Generate a unique call ID"""
-    timestamp = int(timezone.now().timestamp())
-    unique_id = str(uuid.uuid4())[:8]
-    return f"call_{campaign_id}_{phone_number}_{timestamp}_{unique_id}"
+    """Generate a unique call ID using UUID"""
+    return str(uuid.uuid4())
 
 
 def is_valid_phone_number(phone_number):
@@ -196,3 +212,112 @@ def is_valid_phone_number(phone_number):
 def is_time_in_window(current, start, end):
     """ Returns True if current time is within [start, end] window. """
     return start <= current <= end
+
+
+class CallQueueManager:
+    """
+    Redis-based call queue manager
+    
+    Manages a Redis list as a FIFO queue for pending calls.
+    Automatically processes calls as concurrency slots become available.
+    """
+    
+    QUEUE_KEY_PREFIX = "call_queue:"
+    
+    @staticmethod
+    def add_to_queue(campaign_id, phone_numbers, priority=0):
+        """
+        Add phone numbers to Redis queue
+        
+        Args:
+            campaign_id: Campaign ID
+            phone_numbers: List of phone numbers
+            priority: Priority level (higher = processed first)
+            
+        Returns:
+            dict: Status of queued calls
+        """
+        try:
+            queue_key = f"{CallQueueManager.QUEUE_KEY_PREFIX}{campaign_id}"
+            queued_count = 0
+            
+            for phone_number in phone_numbers:
+                # Create queue entry
+                entry = {
+                    'campaign_id': campaign_id,
+                    'phone_number': phone_number,
+                    'priority': priority,
+                    'queued_at': timezone.now().isoformat()
+                }
+                
+                # Push to Redis list (RPUSH = add to end of list)
+                redis_client.rpush(queue_key, json.dumps(entry))
+                queued_count += 1
+            
+            logger.info(f"[Queue Manager] Added {queued_count} calls to queue for campaign {campaign_id}")
+            
+            return {
+                'success': True,
+                'queued_count': queued_count,
+                'queue_key': queue_key
+            }
+            
+        except Exception as e:
+            logger.error(f"[Queue Manager] Error adding to queue: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    @staticmethod
+    def get_queue_size(campaign_id):
+        """Get number of pending calls in queue"""
+        try:
+            queue_key = f"{CallQueueManager.QUEUE_KEY_PREFIX}{campaign_id}"
+            return redis_client.llen(queue_key)
+        except Exception as e:
+            logger.error(f"[Queue Manager] Error getting queue size: {str(e)}")
+            return 0
+    
+    @staticmethod
+    def pop_from_queue(campaign_id, count=1):
+        """
+        Pop calls from queue (FIFO)
+        
+        Args:
+            campaign_id: Campaign ID
+            count: Number of calls to pop
+            
+        Returns:
+            list: List of queue entries
+        """
+        try:
+            queue_key = f"{CallQueueManager.QUEUE_KEY_PREFIX}{campaign_id}"
+            entries = []
+            
+            for _ in range(count):
+                # LPOP = pop from beginning of list (FIFO)
+                entry_json = redis_client.lpop(queue_key)
+                if entry_json:
+                    entry = json.loads(entry_json)
+                    entries.append(entry)
+                else:
+                    break
+            
+            return entries
+            
+        except Exception as e:
+            logger.error(f"[Queue Manager] Error popping from queue: {str(e)}")
+            return []
+    
+    @staticmethod
+    def clear_queue(campaign_id):
+        """Clear all pending calls from queue"""
+        try:
+            queue_key = f"{CallQueueManager.QUEUE_KEY_PREFIX}{campaign_id}"
+            redis_client.delete(queue_key)
+            logger.info(f"[Queue Manager] Cleared queue for campaign {campaign_id}")
+            return True
+        except Exception as e:
+            logger.error(f"[Queue Manager] Error clearing queue: {str(e)}")
+            return False
