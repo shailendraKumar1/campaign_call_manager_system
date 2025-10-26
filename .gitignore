@@ -165,4 +165,4 @@ dump.rdb
 .vscode/
 
 # Docker
-.dockerignore
+# .dockerignore should be tracked
