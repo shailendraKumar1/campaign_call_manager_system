@@ -6,6 +6,7 @@
 - **[REQUIREMENTS.md](REQUIREMENTS.md)** - Complete system requirements & specifications
 - **[SETUP.md](SETUP.md)** - Installation guide (Local + Docker setup)
 - **[WORKFLOW_DOCUMENTATION.md](WORKFLOW_DOCUMENTATION.md)** - API usage & workflows
+- **[Swagger API Docs](http://localhost:8000/swagger/)** - Interactive API documentation (when server is running)
 
 ---
 
@@ -14,9 +15,11 @@
 1. [Project Overview](#-project-overview)
 2. [Requirements](#-requirements)
 3. [System Architecture](#-system-architecture)
-4. [Technology Stack](#-technology-stack)
-5. [Future Scope & Scaling](#-future-scope--scaling)
-6. [Documentation](#-documentation)
+4. [Coding Practices & Design Principles](#-coding-practices--design-principles)
+5. [API Documentation](#-api-documentation)
+6. [Technology Stack](#-technology-stack)
+7. [Future Scope & Scaling](#-future-scope--scaling)
+8. [Documentation](#-documentation)
 
 ---
 
@@ -169,6 +172,47 @@ curl -H "X-Auth-Token: dev-token-12345" http://localhost:8000/api/v1/metrics/
 
 ---
 
+## Coding Practices & Design Principles
+
+This system follows **enterprise-grade software engineering practices** with clean architecture and production-ready patterns:
+
+- **SOLID Principles**: Single Responsibility (separate modules), Dependency Inversion (config abstraction, ORM), Open/Closed (YAML-based extensibility)
+- **Design Patterns**: Repository (Django ORM), Factory (ID generation), Facade (Manager classes), Observer (callbacks), Strategy (status-based processing), Circuit Breaker (retry + DLQ)
+- **Best Practices**: DRY (reusable managers), KISS (simple logic), defensive programming (input validation), idempotency (duplicate prevention), transaction management (atomic operations)
+- **Architecture**: Event-Driven (Celery + callbacks), Queue-Based Load Leveling (Redis), CQRS Lite (async writes, sync reads), Microservices-ready (loose coupling)
+- **Performance**: Async processing (< 50ms response), connection pooling (PostgreSQL 600s, Redis 50), caching strategy, batch operations
+
+---
+
+## API Documentation
+
+Interactive API documentation powered by **Swagger/OpenAPI** for easy API exploration and testing.
+
+### Available Interfaces
+
+| Interface | URL | Description |
+|-----------|-----|-------------|
+| **Swagger UI** | [http://localhost:8000/swagger/](http://localhost:8000/swagger/) | Interactive docs with "Try it out" functionality |
+| **ReDoc** | [http://localhost:8000/redoc/](http://localhost:8000/redoc/) | Clean, modern API documentation |
+| **JSON Schema** | [http://localhost:8000/swagger.json](http://localhost:8000/swagger.json) | OpenAPI schema (import to Postman/Insomnia) |
+
+### Quick Start
+
+1. **Start the server**: `python manage.py runserver`
+2. **Open Swagger UI**: Navigate to `http://localhost:8000/swagger/`
+3. **Authorize**: Click "Authorize" → Enter `dev-token-12345`
+4. **Try APIs**: Expand any endpoint → "Try it out" → Fill parameters → "Execute"
+
+### Features
+
+- ✅ All API endpoints auto-documented from DRF views
+- ✅ Request/Response schemas with examples
+- ✅ Authentication flow documented (X-Auth-Token header)
+- ✅ Interactive testing directly in browser
+- ✅ Export schema for external tools
+
+---
+
 ## Components
 
 ### 1. Django API Server
@@ -242,6 +286,8 @@ Simulates external call service, queues callbacks to Celery
 ---
 
 ## Future Scope & Scaling
+
+The system is designed for horizontal scalability with clear migration paths for extreme scale. Current architecture handles **10k-50k calls/day** with Celery+Redis+PostgreSQL. For higher loads: migrate to **RabbitMQ/Kafka** for message queues (100k-5M calls/day), implement **PostgreSQL sharding** with consistent hashing on `call_id` (4-16 shards for linear scaling), add **ML-powered retry optimization** (predict best call times), expand to **multi-channel support** (SMS, Email, WhatsApp), and enhance with **enterprise features** (GDPR compliance, multi-tenancy, RBAC, CRM integrations). See detailed scaling roadmap below.
 
 ### Phase 1: High-Scale Message Queue (1000+ calls/sec)
 

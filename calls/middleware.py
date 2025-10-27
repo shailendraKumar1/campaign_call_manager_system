@@ -22,6 +22,9 @@ class AuthTokenMiddleware(MiddlewareMixin):
     - /admin/
     - /health/
     - /docs/
+    - /swagger/
+    - /redoc/
+    - /api/docs/
     """
     
     # Paths that don't require authentication
@@ -30,6 +33,9 @@ class AuthTokenMiddleware(MiddlewareMixin):
         '/health/',
         '/docs/',
         '/static/',
+        '/swagger',      # Swagger UI
+        '/redoc',        # ReDoc UI
+        '/api/docs/',    # API Documentation
     ]
     
     # HTTP methods that don't require authentication for some endpoints

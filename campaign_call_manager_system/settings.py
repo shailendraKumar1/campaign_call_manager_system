@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',             # Added DRF
+    'drf_yasg',                   # Swagger API documentation
     'django_redis',               # Required for Redis cache backend
     'django_celery_beat',         # Celery Beat scheduler
     'calls',                      # Your core campaign app
