@@ -143,7 +143,7 @@ class RequestLoggingMiddleware(MiddlewareMixin):
         """
         Log incoming request details
         """
-        logger.info(
+        logger.debug(
             f"Incoming Request: {request.method} {request.path} "
             f"[IP: {self._get_client_ip(request)}] "
             f"[User-Agent: {request.META.get('HTTP_USER_AGENT', 'Unknown')}]"
@@ -163,7 +163,7 @@ class RequestLoggingMiddleware(MiddlewareMixin):
         """
         Log outgoing response details
         """
-        logger.info(
+        logger.debug(
             f"Outgoing Response: {request.method} {request.path} "
             f"[Status: {response.status_code}] "
             f"[IP: {self._get_client_ip(request)}]"

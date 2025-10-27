@@ -72,7 +72,7 @@ class ConcurrencyManager:
                     campaign_id=campaign_id
                 )
                 
-                logger.info(f"Call tracking started: {call_id}")
+                logger.debug(f"Call tracking started: {call_id}")
                 return True
                 
         except Exception as e:
@@ -159,7 +159,7 @@ class MetricsManager:
                         setattr(metrics, key, current_value + value)
             
             metrics.save()
-            logger.info(f"Updated metrics for {date}: {kwargs}")
+            logger.debug(f"Updated metrics for {date}: {kwargs}")
             
         except Exception as e:
             logger.error(f"Error updating metrics: {str(e)}")

@@ -190,11 +190,7 @@ class BulkInitiateCallView(APIView):
             immediate_numbers = phone_numbers[:immediate_count]
             queued_numbers = phone_numbers[immediate_count:]
             
-            logger.info(
-                f"[Bulk Call] Total: {len(phone_numbers)}, "
-                f"Immediate: {immediate_count}, Queue: {len(queued_numbers)}, "
-                f"Available slots: {available_slots}"
-            )
+            logger.info(f"[Bulk Call] Processing {len(phone_numbers)} calls (immediate: {immediate_count}, queued: {len(queued_numbers)})")
             
             # Process immediate calls (within concurrency limit)
             call_ids = []
@@ -239,7 +235,6 @@ class BulkInitiateCallView(APIView):
                     process_call_initiation.delay(call_id, phone_number, campaign_id)
                     
                     call_ids.append(call_id)
-                    logger.info(f"Bulk call initiated: {call_id}")
                     
                 except Exception as e:
                     logger.error(f"Error initiating call for {phone_number}: {str(e)}")
@@ -262,6 +257,12 @@ class BulkInitiateCallView(APIView):
                         args=[campaign_id], 
                         countdown=2  # Start processing after 2 seconds
                     )
+            
+            # Summary log
+            logger.info(
+                f"[Bulk Call] Completed - Campaign {campaign_id}: "
+                f"Started: {len(call_ids)}, Queued: {queued_count}, Failed: {len(failed_numbers)}"
+            )
             
             # Prepare response
             batch_id = f"batch_{int(timezone.now().timestamp())}_{campaign_id}"
@@ -351,7 +352,7 @@ class CallBackView(APIView):
                     
                     # Process callback async (additional processing)
                     process_callback_event.delay(call_id, status_val, call_duration, external_call_id)
-                    logger.info(f"Callback: {call_id} -> {status_val}")
+                    logger.debug(f"Callback: {call_id} -> {status_val}")
                     
                     return Response({
                         "success": True,

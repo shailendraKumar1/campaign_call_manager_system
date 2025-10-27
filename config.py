@@ -46,8 +46,8 @@ class Config:
     # Probabilities should sum to 1.0
     # Format: [(status, probability, (min_duration, max_duration)), ...]
     MOCK_CALL_OUTCOMES = [
-        ('PICKED', 0.60, (30, 180)),        # 60% - Call answered (30s to 3min)
-        ('DISCONNECTED', 0.25, (1, 10)),    # 25% - Call disconnected (1-10s)
+        ('PICKED', 0.70, (30, 180)),        # 60% - Call answered (30s to 3min)
+        ('DISCONNECTED', 0.15, (1, 10)),    # 15% - Call disconnected (1-10s)
         ('RNR', 0.10, (20, 40)),            # 10% - Ring no response (20-40s)
         ('FAILED', 0.05, (1, 3)),           # 5% - Call failed immediately (1-3s)
     ]
